@@ -1,0 +1,11 @@
+---
+apiVersion: getambassador.io/v1
+kind: Mapping
+metadata: 
+  name: jaeger-ui
+  namespace: observability
+spec:   
+  bypass_auth: true
+  prefix: /jaeger/
+  rewrite: /jaeger/
+  service: jaeger-query.observability

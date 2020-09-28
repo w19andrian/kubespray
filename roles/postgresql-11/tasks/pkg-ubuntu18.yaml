@@ -1,0 +1,19 @@
+---
+- name: Add GPG key PostgreSQL Ubuntu 18.04
+  apt_key:
+    url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+    state: present
+   
+- name: Add PostgreSQL repo Ubuntu 18.04
+  apt_repository:
+    repo: deb http://apt.postgresql.org/pub/repos/apt/ bionic-pgdg main
+    state: present
+
+- name: Install PostgreSQL 11 Ubuntu 18.04
+  apt:
+    name: 
+      - "postgresql-11" 
+      - "postgresql-client-11"
+    update_cache: yes
+    state: present
+    

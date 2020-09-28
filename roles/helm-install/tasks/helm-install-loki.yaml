@@ -1,0 +1,24 @@
+- name: Create namespace monitoring
+  k8s:
+    name: monitoring
+    api_version: v1
+    kind: Namespace
+    state: present
+    
+- name: Create label loki
+  shell: /usr/local/bin/kubectl label nodes {{ inventory_hostname }} loki=loki
+
+- name: Install helm chart loki
+  helm:
+    host: localhost
+    port: 45000
+    chart:
+      name: loki
+      source:
+        type: git
+        location:  https://github.com/grafana/loki
+        path: production/helm/loki
+    state: present
+    name: loki
+    namespace: monitoring
+    values: "{{ lookup('template', '../templates/values-loki.yaml.j2') | from_yaml }}"

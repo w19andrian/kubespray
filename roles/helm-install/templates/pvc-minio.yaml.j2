@@ -1,0 +1,30 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nodeflux-sparse-sc
+  labels:
+    openebs: openebs
+  annotations:
+    openebs.io/cas-type: cstor
+    cas.openebs.io/config: |
+      - name: StoragePoolClaim
+        value: "cstor-sparse-pool"
+      - name: ReplicaCount
+        value: "1"
+provisioner: openebs.io/provisioner-iscsi
+reclaimPolicy: Delete
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: cstor-minio-sparse-pvc
+  namespace: minio
+  labels: 
+    minio: minio
+spec:
+  storageClassName: nodeflux-sparse-sc
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ storage_minio }}

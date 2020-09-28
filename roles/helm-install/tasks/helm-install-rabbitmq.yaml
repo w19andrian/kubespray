@@ -1,0 +1,51 @@
+- name: Check Pod rabbitmq
+  k8s_facts:
+    api_version: v1
+    kind: Pod
+    namespace: rabbitmq
+  register: rabbitmq_pod
+
+- name: Create rabbitmq namespace
+  k8s:
+    name: rabbitmq
+    api_version: v1
+    kind: Namespace
+    state: present
+  when: 
+    - rabbitmq_pod.resources==[]
+
+- name: Create label rabbitmq
+  shell: /usr/local/bin/kubectl label nodes {{ inventory_hostname }} rabbitmq=rabbitmq
+
+- name: Create PVC for rabbitmq
+  k8s:
+    state: present
+    definition: "{{ lookup('template', '../templates/pvc-rabbitmq.yaml.j2') | from_yaml}}"
+
+- name: Create password for rabbitmq
+  vars:
+    pswd_rabbitmq: "{{ lookup('password', '/dev/null length=11 chars=ascii_letters') }}"
+  set_fact:
+        password_rabbitmq: "{{ pswd_rabbitmq }}"
+
+- name: Install helm chart rabbitmq
+  helm:
+    host: localhost
+    port: 45000
+    chart:
+      name: rabbitmq
+      source:
+        type: git
+        location: https://github.com/helm/charts
+        path: stable/rabbitmq
+    state: present
+    name: rabbitmq
+    namespace: rabbitmq
+    values: "{{ lookup('template', '../templates/values-rabbitmq.yaml.j2') | from_yaml}}"
+
+  - name: Check rabbitmq pod running
+    shell: /usr/local/bin/kubectl get pod -n rabbitmq -o json
+    register: rabbitmq_running
+    until: rabbitmq_running.stdout|from_json|json_query('items[*].status.phase')|unique == ["Running"]
+    retries: 5
+    delay: 120

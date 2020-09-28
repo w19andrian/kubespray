@@ -1,0 +1,74 @@
+- name: Check Pod metabase
+  k8s_facts:
+    api_version: v1
+    kind: Pod
+    namespace: metabase
+  register: metabase_pod
+
+- name: Create metabase namespace
+  k8s:
+    name: metabase
+    api_version: v1
+    kind: Namespace
+    state: present
+  when: 
+      - metabase_pod.resources==[]
+
+- name: Create database metabase
+  become: true
+  become_user: postgres
+  postgresql_db:
+    name: "{{ database_metabase }}"
+    state: present
+
+- name: Adds postgis extension to the database metabase
+  become: true
+  become_user: postgres
+  postgresql_ext:
+    name: postgis
+    db: "{{ database_metabase }}"
+
+- name: Create password for metabase
+  vars:
+    pswd_metabase: "{{ lookup('password', '/dev/null length=11 chars=ascii_letters') }}"
+  set_fact:
+        password_metabase: "{{ pswd_metabase }}"
+
+- name: Hash database password metabase
+  shell: echo -n '{{ password_metabase }}{{ username_metabase }}' | md5sum | awk '{print $1}'
+  register: db_pass_metabase
+
+- name: Create database metabase username and password
+  become: true
+  become_user: postgres
+  postgresql_user:
+    db: "{{ database_metabase}}"
+    name: "{{ username_metabase }}"
+    password: "md5{{ db_pass_metabase.stdout }}"
+    priv: "ALL"
+    expires: infinity
+    
+- name: Create label metabase
+  shell: /usr/local/bin/kubectl label nodes {{ inventory_hostname }} metabase=metabase
+
+- name: Install helm chart metabase
+  helm:
+    host: localhost
+    port: 45000
+    chart:
+      name: metabase
+      source:
+        type: git
+        location: https://github.com/helm/charts
+        path: stable/metabase
+    state: present
+    name: metabase
+    namespace: metabase
+    values: "{{ lookup('template', '../templates/values-metabase.yaml.j2') | from_yaml}}"
+
+- name: Check metabase pod running
+  shell: /usr/local/bin/kubectl get pod -n metabase -o json
+  register: metabase_running
+  until: metabase_running.stdout|from_json|json_query('items[*].status.phase')|unique == ["Running"]
+  retries: 5
+  delay: 60

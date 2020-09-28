@@ -1,0 +1,212 @@
+- name: Install PostgreSQL 12 database Ubuntu 18.04
+  include_tasks: pkg-ubuntu18.yaml
+
+- name: Copy postgresql config file
+  template:
+    src: "postgresql.conf.j2"
+    dest: "{{ postgres_conf_dir }}/postgresql.conf"
+    owner: postgres
+    group: postgres
+    mode: 00644
+  
+- name: Copy pg_hba config file
+  template:
+    src: "pg_hba.conf.j2"
+    dest: "{{ postgres_conf_dir }}/pg_hba.conf"
+    owner: postgres
+    group: postgres
+    mode: 0600
+
+- name: Enable and check PostgreSQL 12 service Ubuntu 18.04
+  systemd:
+    name: postgresql
+    daemon_reload: yes
+    state: restarted
+    enabled: yes
+  register: started_postgresql
+
+- name: Install Dependencies posgis 3
+  package:
+    name:
+      - postgresql-server-dev-12
+      - postgresql-12-postgis-3
+      - python-pip
+    state: present
+    update_cache: yes
+
+- name: export LC_ALL=C
+  shell: export LC_ALL=C 
+
+- name: install Psycopg2 python module
+  pip:
+    name: psycopg2
+
+- name: Create database analytics
+  become: true
+  become_user: postgres
+  postgresql_db:
+    name: "{{ database_analytics }}"
+    state: present
+
+- name: Create databases visionaire
+  become: true
+  become_user: postgres
+  postgresql_db:
+    name: "{{ database_visionaire }}"
+    state: present
+
+- name: Adds postgis extension to the database analytics
+  become: true
+  become_user: postgres
+  postgresql_ext:
+    name: postgis
+    db: "{{ database_analytics }}"
+
+- name: Adds postgis extension to the database visionaire
+  become: true
+  become_user: postgres
+  postgresql_ext:
+    name: postgis
+    db: "{{ database_visionaire }}"
+
+- name: Create password for analytics
+  when: database_analytics is defined
+  vars:
+    pswd_analytics: "{{ lookup('password', '/dev/null length=11 chars=ascii_letters') }}"
+  set_fact:
+        password_analytics: "{{ pswd_analytics }}"
+
+- name: Create password for visionaire
+  when: database_visionaire is defined
+  vars:
+    pswd_visionaire: "{{ lookup('password', '/dev/null length=11 chars=ascii_letters') }}"
+  set_fact:
+        password_visionaire: "{{ pswd_visionaire }}"
+  
+- name: Hash database password analytics
+  when: 
+    - database_analytics is defined
+  shell: echo -n '{{ password_analytics }}{{ username_analytics }}' | md5sum | awk '{print $1}'
+  register: db_pass_analytics
+
+- name: Hash database password visionaire
+  when: 
+    - database_visionaire is defined
+  shell: echo -n '{{ password_visionaire }}{{ username_visionaire }}' | md5sum | awk '{print $1}'
+  register: db_pass_visionaire
+
+- name: Create database analytics username and password
+  when:
+    - database_analytics is defined
+  become: true
+  become_user: postgres
+  postgresql_user:
+    db: "{{ database_analytics}}"
+    name: "{{ username_analytics }}"
+    password: "md5{{ db_pass_analytics.stdout }}"
+    priv: "ALL"
+    expires: infinity
+
+- name: Create database visionaire username and password
+  when:
+    - database_visionaire is defined
+  become: true
+  become_user: postgres
+  postgresql_user:
+    db: "{{ database_visionaire }}"
+    name: "{{ username_visionaire }}"
+    password: "md5{{ db_pass_visionaire.stdout }}"
+    priv: "ALL"
+    expires: infinity
+
+- name: Create hash db url for analytics k8s
+  shell: echo -n 'postgres://{{username_analytics}}:{{password_analytics}}@{{ansible_default_ipv4.address}}:5432/{{database_analytics}}?sslmode=disable'| base64 -w 0
+  register: url_analytics
+
+- name: Create hash db url for visionaire k8s
+  shell: echo -n 'postgres://{{username_visionaire}}:{{password_visionaire}}@{{ansible_default_ipv4.address}}:5432/{{database_visionaire}}?sslmode=disable'| base64 -w 0
+  register: url_visionaire
+
+# git clone https://github.com/openshift/openshift-restclient-python.git
+# cd openshift-restclient-python
+# python setup.py install
+# or
+# pip install openshift
+
+- name: Create namespace analytics
+  k8s:
+    name: analytics
+    api_version: v1
+    kind: Namespace
+    state: present
+
+- name: Create secret url analytics k8s
+  k8s: # need python openshift client
+    state: present 
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: db-url-analytics
+        namespace: analytics
+      data:
+        db-url-analytics: "{{ url_analytics.stdout }}"
+
+# git clone https://github.com/openshift/openshift-restclient-python.git
+# cd openshift-restclient-python
+# python setup.py install
+# or
+# pip install openshift
+
+- name: Create namespace solution
+  k8s:
+    name: solution
+    api_version: v1
+    kind: Namespace
+    state: present
+
+- name: Create secret url visionaire k8s
+  k8s: # need python openshift client
+    state: present 
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: database
+        namespace: solution
+      data:
+         DATABASE_URL: "{{ url_visionaire.stdout }}"
+
+# - name: Create secret url visionaire k8s
+#   kubernetes: #need to open kubeapi-server (kubectl proxy --port=8080 --address=0.0.0.0 --disable-filter=false)
+#     api_endpoint: localhost:8080
+#     insecure: yes
+#     inline_data:
+#       apiVersion: v1
+#       kind: Secret
+#       metadata:
+#         name: db-url-visionaire
+#         namespace: default
+#       data:
+#         db-url-analytics: "{{ url_visionaire.stdout }}"
+#     state: present
+
+# - name: Create secret url analytics k8s
+#   kubernetes: #need to open kubeapi-server (kubectl proxy --port=8080 --address=0.0.0.0 --disable-filter=false)
+#     api_endpoint: localhost:8080
+#     insecure: yes
+#     inline_data:
+#       apiVersion: v1
+#       kind: Secret
+#       metadata:
+#         name: db-url-analytics
+#         namespace: default
+#       data:
+#         db-url-analytics: "{{ url_analytics.stdout }}"
+#     state: present
+
+#- name: Create secret url analytics k8s
+#  shell: kubectl create secret generic db-url-analytics --from-literal=db-url-analytics=postgres://{{username_analytics}}:{{password_analytics}}@{{ansible_default_ipv4.address}}:5432/{{database_analytics}}
+
+#- name: Create secret url visionaire k8s
+#  shell: kubectl create secret generic db-url-visionaire --from-literal=db-url-visionaire=postgres://{{username_visionaire}}:{{password_visionaire}}@{{ansible_default_ipv4.address}}:5432/{{database_visionaire}}

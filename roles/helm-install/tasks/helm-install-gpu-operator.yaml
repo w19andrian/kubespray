@@ -1,0 +1,65 @@
+- name: Check GPU-Operator resources
+  k8s_facts:
+    api_version: v1
+    kind: Pod
+    namespace: gpu-operator-resources
+  register: gpuoperator_pod
+  
+- name: Check if driver.conf exist
+  stat: 
+    path: /etc/modules-load.d/driver.conf
+  register: driver_conf
+
+- name: Add i2c_core & ipmi_msghandler
+  copy:
+    dest: "/etc/modules-load.d/driver.conf"
+    content: |
+      i2c_core
+      ipmi_msghandler
+
+- name: Load Modprobe i2c_core & ipmi_msghandler
+  modprobe:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - i2c_core
+    - ipmi_msghandler
+
+- name: Add Nvidia GPU Operator Helm Repo
+  shell: helm repo add nvidia https://nvidia.github.io/gpu-operator
+
+- name: Helm Repo Update
+  shell: helm repo update
+
+- name: Install Helm Chart Nvidia GPU Operator
+  shell: helm install nvidia/gpu-operator -n gpu-operator --wait
+    
+- name: Deploy GPU Operator
+  k8s:
+    definition: '{{ item }}'
+    state: present
+  with_items: '{{ lookup("url", "https://raw.githubusercontent.com/NVIDIA/gpu-operator/master/manifests/cr/sro_cr_sched_none.yaml", split_lines=False) | from_yaml_all | list }}'                                              
+  when: item is not none
+
+- name: Create ServiceMonitor for nvidia-dcgm-exporter
+  k8s:
+    state: present
+    definition:
+      apiVersion: monitoring.coreos.com/v1
+      kind: ServiceMonitor
+      metadata:
+        name: nvidia-dcgm-exporter
+        namespace: monitoring
+        labels:
+          app: nvidia-dcgm-exporter
+          release: prometheus-operator
+      spec:
+        endpoints:
+        - path: /gpu/metrics
+          port: gpu-metrics
+        namespaceSelector:
+          matchNames:
+          - gpu-operator-resources
+        selector:
+          matchLabels:
+            app: nvidia-dcgm-exporter

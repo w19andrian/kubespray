@@ -1,0 +1,29 @@
+- name: Check service ingress-nginx
+  k8s_facts:
+    api_version: v1
+    kind: Pod
+    namespace: ingress-nginx
+  register: ingress_nginx_pod
+
+- name: Create namespace ingress-nginx
+  k8s:
+    name: ingress-nginx
+    api_version: v1
+    kind: Namespace
+    state: present
+  when: ingress_nginx_pod.resources==[]
+
+- name: Install helm chart ingress-nginx
+  when: ingress_nginx_pod.resources==[]
+  helm:
+    host: localhost
+    port: 45000
+    chart:
+      name: ingress-nginx
+      source:
+        type: repo
+        location: https://kubernetes.github.io/ingress-nginx
+        path: ingress-nginx/ingress-nginx
+    state: present
+    name: ingress-nginx
+    namespace: ingress-nginx

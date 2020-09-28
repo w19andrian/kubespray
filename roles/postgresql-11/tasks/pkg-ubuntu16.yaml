@@ -1,0 +1,18 @@
+---
+- name: Add GPG key PostgreSQL Ubuntu 16.04
+  apt_key:
+    url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+    state: present
+   
+- name: Add PostgreSQL repo Ubuntu 16.04
+  apt_repository:
+    repo: deb http://apt.postgresql.org/pub/repos/apt/ xenial-pgdg main
+    state: present
+
+- name: Install PostgreSQL 11 Ubuntu 16.04
+  package:
+    name:
+      - postgresql-11
+      - postgresql-client-11
+    state: present
+    update_cache: yes

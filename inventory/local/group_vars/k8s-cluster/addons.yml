@@ -1,11 +1,10 @@
 ---
 # Kubernetes dashboard
 # RBAC required. see docs/getting-started.md for access details.
-dashboard_enabled: false
+dashboard_enabled: true
 
 # Helm deployment
-helm_enabled: true
-helm_version: v3.3.3
+helm_enabled: false
 
 # Registry deployment
 registry_enabled: false
@@ -14,10 +13,10 @@ registry_enabled: false
 # registry_disk_size: "10Gi"
 
 # Metrics Server deployment
-metrics_server_enabled: true
-metrics_server_kubelet_insecure_tls: true
-metrics_server_metric_resolution: 60s
-metrics_server_kubelet_preferred_address_types: "InternalIP"
+metrics_server_enabled: false
+# metrics_server_kubelet_insecure_tls: true
+# metrics_server_metric_resolution: 60s
+# metrics_server_kubelet_preferred_address_types: "InternalIP"
 
 # Rancher Local Path Provisioner
 local_path_provisioner_enabled: false
@@ -118,8 +117,8 @@ ingress_alb_enabled: false
 # alb_ingress_aws_debug: "false"
 
 # Cert manager deployment
-cert_manager_enabled: true
-cert_manager_namespace: "cert-manager"
+cert_manager_enabled: false
+# cert_manager_namespace: "cert-manager"
 
 # MetalLB deployment
 metallb_enabled: false

@@ -1,0 +1,17 @@
+- name: Create label openebs
+  shell: /usr/local/bin/kubectl label nodes {{ inventory_hostname }} openebs=openebs
+
+- name: Install helm chart openebs
+  helm:
+    host: localhost
+    port: 45000
+    chart:
+      name: openebs
+      source:
+        type: git
+        location: https://github.com/helm/charts
+        path: stable/openebs
+    state: present
+    name: openebs
+    namespace: openebs
+    values: "{{ lookup('template', '../templates/values-openebs.yaml.j2') | from_yaml}}"

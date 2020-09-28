@@ -1,0 +1,182 @@
+- name: Install Dependecies CentOS
+  when: ansible_os_family == 'CentOS' or ansible_os_family == 'RedHat'
+  yum:
+    name:
+      - "epel-release"
+      - "yum-utils"
+      - "gcc"
+    state: present
+
+- name: Install Dependecies CentOS
+  when: ansible_os_family == 'CentOS' or ansible_os_family == 'RedHat'
+  yum:
+    name:
+      - "python-pip"
+    state: present
+
+- name: Upgrade Pip
+  pip:
+    name: pip
+    state: latest
+
+- name: Install Setuptools
+  pip:
+    name: setuptools
+    state: latest
+
+- name: Install helm ansible module dependency
+  pip:
+    name:
+        - pyhelm
+        - grpcio
+        - gitdb
+        - configparser
+        - openshift
+    state: latest
+    extra_args: --ignore-installed
+
+- name: Enable tiller-deploy port-forwarding
+  raw: nohup kubectl port-forward -n kube-system svc/tiller-deploy 45000:44134 --address 0.0.0.0 </dev/null >/dev/null 2>&1 & sleep 1
+
+- name: Check Pod metallb
+  k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: metallb-system
+  register: metallb_pod
+
+- name: Helm Install metallb
+  when: metallb_pod.resources==[]
+  include_tasks: k8s-install-metallb.yaml
+
+- name: Check metallb pod running
+  shell: /usr/local/bin/kubectl get pod -n metallb-system -o json
+  register: metallb_running
+  until: metallb_running.stdout|from_json|json_query('items[*].status.phase')|unique == ["Running"]
+  retries: 5
+  delay: 60
+
+- name: Helm Install ingress-nginx
+  when: ambassador_enabled is false
+  include_tasks: helm-install-ingress-nginx.yaml
+
+- name: Helm Install ambassador
+  when: ambassador_enabled is true
+  include_tasks: helm-install-ambassador.yaml
+
+- name: Helm Install metabase
+  when: 
+    - metabase_enabled is true
+  include_tasks: helm-install-metabase.yaml
+
+- name: Check Pod openebs
+  k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: openebs
+  register: openebs_pod
+
+- name: Helm Install openebs
+  when: openebs_pod.resources==[]
+  include_tasks: helm-install-openebs.yaml
+
+- name: Check openebs pod running
+  shell: /usr/local/bin/kubectl get pod -n openebs -o json
+  register: openebs_running
+  until: openebs_running.stdout|from_json|json_query('items[*].status.phase')|unique == ["Running"]
+  retries: 5
+  delay: 120
+
+- name: Check Pod minio
+  k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: minio
+  register: minio_pod
+
+- name: Helm Install minio
+  when: minio_pod.resources==[]
+  include_tasks: helm-install-minio.yaml
+
+- name: Check minio pod running
+  shell: /usr/local/bin/kubectl get pod -n minio -o json
+  register: minio_running
+  until: minio_running.stdout|from_json|json_query('items[*].status.phase')|unique == ["Running"]
+  retries: 5
+  delay: 60
+
+
+- name: Helm Install rabbitmq
+  when: rabbitmq_enabled is true
+  include_tasks: helm-install-rabbitmq.yaml
+
+
+- name: Helm Install elasticsearch
+  when: 
+    - elasticsearch_enabled is true
+  include_tasks: helm-install-elasticsearch.yaml
+
+
+- name: Check service jaeger-collector
+  k8s_info:
+    api_version: v1
+    kind: Service
+    name: jaeger-collector
+    namespace: observability
+  register: jaeger_collector_svc
+
+- name: Helm Install jaeger
+  when: jaeger_enabled is true
+  include_tasks: helm-install-jaeger.yaml
+
+- name: Check prometheus-operator
+  k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: monitoring
+  register: monitoring_pod
+
+- name: Helm Install prometheus-operator
+  when: 
+  - monitoring_pod.resources==[]
+  include_tasks: helm-install-prometheus-operator.yaml
+
+- name: Check loki pod
+  k8s_info:
+    api_version: v1
+    kind: Pod
+    name: loki-0
+    namespace: monitoring
+  register: loki_pod
+
+- name: Helm Install loki
+  when: 
+   - loki_pod.resources==[]
+  include_tasks: helm-install-loki.yaml
+
+- name: Check daemonset fluentd
+  k8s_info:
+    api_version: v1
+    kind: Daemonset
+    name: fluentd
+    namespace: kube-system
+  register: fluentd_daemonset
+
+- name: Check Configmap fluentd
+  k8s_info:
+    api_version: v1
+    kind: Configmap
+    name: fluentd-logging
+    namespace: kube-system
+  register: fluentd_cm
+
+- name: K8s Install Fluentd
+  when: fluentd_daemonset.resources==[] and fluentd_cm.resources==[]
+  include_tasks: k8s-install-fluentd.yaml
+
+- name: Helm Install Nvidia GPU-operator
+  when: gpu_operator_enabled is true
+  include_tasks: helm-install-gpu-operator.yaml  
+
+- name: Disable tiller-deploy proxy-server
+  raw: kill -9 $(netstat -tulpn | grep 45000 | awk '{print $7}' | cut -d "/" -f1)

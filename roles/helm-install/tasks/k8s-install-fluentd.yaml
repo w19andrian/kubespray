@@ -1,0 +1,9 @@
+- name: K8s create configmap
+  k8s:
+    state: present
+    definition: "{{ lookup('template', '../templates/configmap-fluentd.yaml')}}"
+
+- name: K8s create daemonset
+  k8s:
+    state: present
+    definition: "{{ lookup('template', '../templates/fluentd-daemonset.yaml')}}"

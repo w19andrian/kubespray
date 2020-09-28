@@ -1,0 +1,75 @@
+- name: Create namespace minio
+  k8s:
+    name: minio
+    api_version: v1
+    kind: Namespace
+    state: present
+
+- name: Create label minio
+  shell: /usr/local/bin/kubectl label nodes {{ inventory_hostname }} minio=minio
+
+- name: Create password for minio
+  vars:
+    pswd_minio: "{{ lookup('password', '/dev/null length=11 chars=ascii_letters') }}"
+  set_fact:
+        password_minio: "{{ pswd_minio }}"
+
+- name: Create Storage Class and PVC for minio
+  k8s:
+    state: present
+    definition: "{{ lookup('template', '../templates/pvc-minio.yaml.j2') }}"
+
+- name: Install helm chart minio
+  helm:
+    host: localhost
+    port: 45000
+    chart:
+      name: minio
+      source:
+        type: git
+        location: https://github.com/helm/charts
+        path: stable/minio
+    state: present
+    name: minio
+    namespace: minio
+    values:  "{{ lookup('template', '../templates/values-minio.yaml.j2') | from_yaml}}"
+
+- name: Check Service minio
+  k8s_facts:
+    api_version: v1
+    kind: Service
+    name: minio
+    namespace: minio
+  register: minio_svc
+
+- name: Create hash MINIO_ACCESS_KEY
+  shell: echo -n '{{ MINIO_ACCESS_KEY }} ' | base64 -w 0
+  register: MINIO_ACCESS_KEY
+
+- name: Create hash MINIO_BUCKET_LOCATION
+  shell: echo -n '{{ MINIO_BUCKET_LOCATION }} ' | base64 -w 0
+  register: MINIO_BUCKET_LOCATION
+
+- name: Create hash MINIO_BUCKET_NAME
+  shell: echo -n 'solution ' | base64 -w 0
+  register: MINIO_BUCKET_NAME
+
+- name: Create hash MINIO_SECRET_KEY
+  shell: echo -n '{{ password_minio }} ' | base64 -w 0
+  register: MINIO_SECRET_KEY
+
+- name: Create hash MINIO_URL
+  shell: echo -n '{{ minio_svc.resources[0].status.loadBalancer.ingress[0].ip }}:9000' | base64 -w 0
+  register: MINIO_URL
+
+- name: Create namespace solution
+  k8s:
+    name: solution
+    api_version: v1
+    kind: Namespace
+    state: present
+
+- name: Create secret minio for solution
+  k8s:
+    state: present
+    definition: "{{ lookup('template', '../templates/secret-minio-solution.yaml.j2') | from_yaml }}"

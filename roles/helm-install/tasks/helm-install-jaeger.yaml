@@ -1,0 +1,31 @@
+- name: Check service jaeger-collector
+  k8s_facts:
+    api_version: v1
+    kind: Service
+    name: jaeger-collector
+    namespace: observability
+  register: jaeger_collector_svc
+
+- name: Create label jaeger
+  shell: kubectl label nodes {{ inventory_hostname }} jaeger=jaeger
+
+- name: Install helm chart jaeger
+  when: jaeger_collector_svc.resources==[]
+  helm:
+    host: localhost
+    port: 45000
+    chart:
+      name: jaeger
+      source:
+        type: repo
+        location: https://jaegertracing.github.io/helm-charts
+        path: jaegertracing/jaeger
+    state: present
+    name: jaeger
+    namespace: observability
+    values:  "{{ lookup('template', '../templates/values-jaeger.yaml.j2') | from_yaml}}"
+
+- name: Create mapping jaeger
+  k8s:
+    state: present
+    definition: "{{ lookup('template', '../templates/mapping-jaeger.yaml.j2') | from_yaml}}"

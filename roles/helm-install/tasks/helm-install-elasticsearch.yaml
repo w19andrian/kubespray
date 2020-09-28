@@ -1,0 +1,40 @@
+- name: Check Pod elasticsearch
+  k8s_facts:
+    api_version: v1
+    kind: Pod
+    namespace: observability
+  register: elastic_pod
+
+- name: Create namespace observability
+  k8s:
+    name: observability
+    api_version: v1
+    kind: Namespace
+    state: present
+  when: 
+    - elastic_pod.resources==[]
+
+- name: Create label elasticsearch
+  shell: /usr/local/bin/kubectl label nodes {{ inventory_hostname }} elasticsearch=elasticsearch
+
+- name: Install helm chart elasticsearch
+  helm:
+    host: localhost
+    port: 45000
+    chart:
+      name: elasticsearch
+      source:
+        type: git
+        location: https://github.com/elastic/helm-charts
+        path: elasticsearch
+    state: present
+    name: elasticsearch
+    namespace: observability
+    values:  "{{ lookup('template', '../templates/values-elasticsearch.yaml.j2') | from_yaml}}"
+
+  - name: Check elasticsearch pod running
+    shell: /usr/local/bin/kubectl get pod -n observability -o json
+    register: elasticsearch_running
+    until: elasticsearch_running.stdout|from_json|json_query('items[*].status.phase')|unique == ["Running"]
+    retries: 5
+    delay: 120

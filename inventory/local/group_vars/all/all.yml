@@ -96,24 +96,3 @@ loadbalancer_apiserver_healthcheck_port: 8081
 ## Set Pypi repo and cert accordingly
 # pyrepo_index: https://pypi.example.com/simple
 # pyrepo_cert: /etc/ssl/certs/ca-certificates.crt
-
-# Addons k8s apps
-rabbitmq_enabled: false
-elasticsearch_enabled: false
-jaeger_enabled: false
-metabase_enabled: false
-ambassador_enabled: false
-gpu_operator_enabled: false
-
-# IP pool for metallb
-metallb_ip_pool: 172.31.32.21-172.31.32.25
-# Storage for minio (PVC)
-storage_minio: 30Gi
-# Storage for rabbitmq (PVC)
-storage_rabbitmq: 30Gi
-# Storage for elasticsearch (PVC)
-storage_elasticsearch: 30Gi
-# Storage for grafana (PVC)
-storage_grafana: 30Gi
-# Storage for prometheus
-storage_prometheus: 30Gi

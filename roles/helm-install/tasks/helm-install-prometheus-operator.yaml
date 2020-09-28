@@ -1,0 +1,32 @@
+- name: Create namespace monitoring
+  k8s:
+    name: monitoring
+    api_version: v1
+    kind: Namespace
+    state: present
+
+- name: Create label prometheus
+  shell: /usr/local/bin/kubectl label nodes {{ inventory_hostname }} prometheus=prometheus
+
+- name: Send values prometheus-operator
+  template:
+    src: "values-prometheus-operator.yaml.j2"
+    dest: "{{ lookup('env','HOME') }}/values-prometheus-operator.yaml"
+
+- name: Install helm chart prometheus-operator
+  shell: helm install --name prometheus-operator --namespace monitoring stable/prometheus-operator -f {{ lookup('env','HOME') }}/values-prometheus-operator.yaml
+
+- name: Create grafana mapping
+  k8s:
+    state: present
+    definition: "{{ lookup('template', '../templates/mapping-grafana.yaml.j2') | from_yaml}}"
+
+#- name: Add GPU grafana dashboard 
+#  k8s:
+#    state: present
+#    definition: "{{ lookup('file', '../files/gpu-dashboard.yaml')}}"
+
+- name: Remove prometheus-operator values files
+  file:
+    path: "{{ lookup('env','HOME') }}/values-prometheus-operator.yaml"
+    state: absent

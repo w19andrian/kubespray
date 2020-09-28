@@ -1,0 +1,25 @@
+---
+- name: Add Repo PostgreSQL-11 CentOS
+  yum:
+   name: "https://download.postgresql.org/pub/repos/yum/11/redhat/rhel-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm"
+   state: present
+   
+- name: Install-Epel-Release CentOS
+  yum:
+    name:
+      - "epel-release"
+      - "yum-utils"
+    state: present
+
+- name: Enable PostgreSQL 11 Repo CentOS
+  yum :
+    enablerepo: pgdg11
+    state: present
+
+- name: Install PostgreSQL 11 CentOS
+  yum:
+    name: 
+      - "postgresql11-server"
+      - "postgresql11"
+    state: present
+    

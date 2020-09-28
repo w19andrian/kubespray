@@ -135,3 +135,15 @@
   roles:
     - { role: kubespray-defaults }
     - { role: kubernetes/preinstall, when: "dns_mode != 'none' and resolvconf_mode == 'host_resolvconf'", tags: resolvconf, dns_late: true }
+
+- hosts: database
+  any_errors_fatal: "{{ any_errors_fatal | default(true) }}"
+  roles:
+    - { role: kubespray-defaults}
+    - { role: postgresql-11}
+
+# - hosts: kube-master[0]
+#   any_errors_fatal: "{{ any_errors_fatal | default(true) }}"
+#   roles:
+#     - { role: kubespray-defaults}
+#     - { role: helm-install}

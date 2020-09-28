@@ -1,0 +1,9 @@
+- name: Install metallb
+  k8s:
+    state: present
+    definition: "{{ lookup('url', '{{ metallb_url }}',  split_lines=False) | from_yaml_all | list  }}"
+
+- name: Create config-map metallb
+  k8s:
+    state: present
+    definition: "{{ lookup('template', '../templates/confmap-metallb.yaml.j2') | from_yaml }}"

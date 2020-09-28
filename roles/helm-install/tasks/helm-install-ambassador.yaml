@@ -1,0 +1,53 @@
+- name: Check Pod ambassador
+  k8s_facts:
+    api_version: v1
+    kind: Pod
+    namespace: gateway
+  register: ambassador_pod
+
+- name: Create namespace gateway
+  k8s:
+    name: gateway
+    api_version: v1
+    kind: Namespace
+    state: present
+  when: ambassador_pod.resources==[]
+# - name: Install helm chart ambassador
+#   helm:
+#     host: localhost
+#     port: 45000
+#     chart:
+#       name: ambassador
+#       source:
+#         type: repo
+#         location: https://www.getambassador.io
+#         path: datawire/ambassador
+#     state: present
+#     name: ambassador
+#     namespace: gateway
+#     values: "{{ lookup('template', '../templates/values-ambassador.yaml.j2') | from_yaml }}"
+
+- name: Create label ambassador
+  shell: /usr/local/bin/kubectl label nodes {{ inventory_hostname }} ambassador=ambassador
+
+- name: Install helm chart ambassador
+  helm:
+    host: localhost
+    port: 45000
+    chart:
+      name: ambassador
+      source:
+        type: git
+        location: https://github.com/helm/charts
+        path: stable/ambassador
+    state: present
+    name: ambassador
+    namespace: gateway
+    values: "{{ lookup('template', '../templates/values-ambassador.yaml.j2') | from_yaml }}"
+
+- name: Check ambassador pod running
+  shell: /usr/local/bin/kubectl get pod -n gateway -o json
+  register: ambassador_running
+  until: ambassador_running.stdout|from_json|json_query('items[*].status.phase')|unique == ["Running"]
+  retries: 5
+  delay: 60

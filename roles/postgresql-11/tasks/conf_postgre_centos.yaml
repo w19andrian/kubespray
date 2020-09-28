@@ -1,0 +1,37 @@
+- name: Install PostgreSQL database CentOs
+  include_tasks: pkg-centos.yaml
+
+- name: Init PostgreSQL CentOs
+  shell: /usr/pgsql-11/bin/postgresql-11-setup initdb
+  ignore_errors: True
+
+- name: Copy postgresql config file
+  template:
+    src: "centos_postgresql.conf.j2"
+    dest: "{{ centos_postgres_conf_dir }}/postgresql.conf"
+    owner: postgres
+    group: postgres
+    mode: 00644
+
+- name: Copy pg_hba config file
+  template:
+    src: "centos_pg_hba.conf.j2"
+    dest: "{{ centos_postgres_conf_dir }}/pg_hba.conf"
+    owner: postgres
+    group: postgres
+    mode: 0600
+
+- name: Enable and check PostgreSQL 11 service CentOs
+  systemd:
+    name: postgresql-11
+    daemon_reload: yes
+    state: restarted
+    enabled: yes
+  register: started_postgresql
+
+- name: Install dependency postgis and postgis
+  yum:
+    name:
+      - "python-pip"
+      - "python-psycopg2"
+    state: present

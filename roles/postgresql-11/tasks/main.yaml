@@ -1,0 +1,32 @@
+---
+# # ### CentOS 7 x86_64
+# - name: Install PostgreSQL database CentOs
+#   when: (ansible_facts['distribution'] == "CentOS" )
+#   include_tasks: conf_postgre_centos.yaml
+# ### postgresql 11 ubuntu 18.04 bionic x86_64
+- name: Check if driver.conf exist
+  stat: 
+    path: "{{ postgres_conf_dir }}/postgresql.conf"
+  register: ubuntu_18_postgresql
+
+- name: Install PostgreSQL 11 database Ubuntu 18.04
+  when: ansible_distribution_release == 'bionic' and ubuntu_18_postgresql.stat.exists == false
+  include_tasks: conf_postgre_ubuntu18.yaml
+
+# ### postgresql 11 ubuntu 16.04 bionic x86_64
+
+- name: Install PostgreSQL 11 database Ubuntu 16.04
+  when: ansible_distribution_release == 'xenial' and ubuntu_16_postgresql.stat.exists == false
+  include_tasks: conf_postgre_ubuntu16.yaml
+
+- name: Check if driver.conf exist
+  when: ansible_os_family == 'RedHat' or ansible_os_family == 'CentOS'
+  stat:
+    path: "{{ centos_postgres_conf_dir }}/postgresql.conf"
+  register: centos_postgresql
+
+- name: Install PostgreSQL 11 database CentOS
+  when: 
+    - ansible_os_family == 'RedHat' or ansible_os_family == 'CentOS'
+    - centos_postgresql.stat.exists == false
+  include_tasks: conf_postgre_centos.yaml

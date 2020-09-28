@@ -1,0 +1,14 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: cstor-rabbitmq-sparse-pvc
+  namespace: rabbitmq
+  labels:
+    rabbitmq: rabbitmq
+spec:
+  storageClassName: nodeflux-sparse-sc
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ storage_rabbitmq }}

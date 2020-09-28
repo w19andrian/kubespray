@@ -1,0 +1,10 @@
+---
+apiVersion: getambassador.io/v1
+kind: Mapping
+metadata:
+  name: grafana
+  namespace: monitoring
+spec:
+  bypass_auth: true
+  prefix: /grafana/
+  service: prometheus-operator-grafana.monitoring
